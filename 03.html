@@ -1,0 +1,274 @@
+<!DOCTYPE html> 
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Te Amo Forever</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: black;
+      font-family: monospace;
+      height: 100vh;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="matrixCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById('matrixCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const fontSize = 18;
+    const letterColor = "#00bfff";
+    const columns = Math.floor(canvas.width / (fontSize * 1.2));
+    let letters = Array(columns).fill().map(() => Math.random() * canvas.height / fontSize);
+    let pulseScale = 1;
+    let pulseDirection = 1;
+
+    function drawMatrix() {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.11)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = `${fontSize * pulseScale}px monospace`;
+      ctx.fillStyle = letterColor;
+
+      for (let i = 0; i < letters.length; i++) {
+        let text = "te amo";
+        let x = i * fontSize * 1.2;
+        let y = letters[i] * fontSize;
+        ctx.fillText(text, x, y);
+        letters[i]++;
+        if (y > canvas.height && Math.random() > 0.99) {
+          letters[i] = 0;
+        }
+      }
+
+      pulseScale += 0.002 * pulseDirection;
+      if (pulseScale > 1.1 || pulseScale < 0.9) pulseDirection *= -1;
+    }
+
+    setInterval(drawMatrix, 33);
+
+    let particles = [];
+    const gravity = 0.15;
+    const particleCount = 100;
+    const word = "teamo ";
+    let pulseTime = 0; // Contador global para sincronizar pulsos
+
+    function generateHeartTargets(cx, cy, scale = 20) {
+      let targets = [];
+      for (let i = 0; i < particleCount; i++) {
+        let t = (i / particleCount) * Math.PI * 2;
+        let x = 16 * Math.pow(Math.sin(t), 3);
+        let y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        x *= scale * 0.6;
+        y *= scale * 0.6;
+        y = -y;
+        targets.push({ x: cx + x, y: cy + y });
+      }
+      return targets;
+    }
+
+    class Particle {
+      constructor(x, y, vx, vy, targetX, targetY, text, noFade = false, size = 18) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.targetX = targetX;
+        this.targetY = targetY;
+        this.text = text;
+        this.alpha = 1;
+        this.size = size;
+        this.phase = noFade ? 'pulsing' : 'exploding'; // Partículas permanentes comienzan en pulsing
+        this.settleTime = 0;
+        this.noFade = noFade;
+      }
+
+      update() {
+        if (this.phase === 'exploding') {
+          this.vy += gravity;
+          this.x += this.vx;
+          this.y += this.vy;
+          if (this.vy > 2 || this.y > this.targetY - 50) {
+            this.phase = 'falling';
+          }
+        } else if (this.phase === 'falling') {
+          const dx = this.targetX - this.x;
+          const dy = this.targetY - this.y;
+          this.x += dx * 0.07;
+          this.y += dy * 0.07;
+          this.vx *= 0.9;
+          this.vy *= 0.9;
+          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+            this.phase = 'settled';
+            this.x = this.targetX;
+            this.y = this.targetY;
+          }
+        } else if (this.phase === 'settled') {
+          this.settleTime++;
+          if (!this.noFade && this.settleTime > 60) {
+            this.phase = 'fading';
+          }
+        } else if (this.phase === 'fading') {
+          this.alpha -= 0.01;
+          if (this.alpha <= 0) {
+            this.phase = 'done';
+          }
+        } else if (this.phase === 'pulsing') {
+          // Oscilación vertical para simular latido
+          this.y = this.targetY + Math.sin(pulseTime * 0.05) * 10;
+          // Pulsación de brillo
+          this.alpha = 0.7 + Math.sin(pulseTime * 0.05) * 0.3;
+          // Pulsación de tamaño para el texto grande
+          if (this.size > 18) {
+            this.size = 48 + Math.sin(pulseTime * 0.05) * 4;
+          }
+        }
+      }
+
+      draw(ctx) {
+        if (this.phase !== 'done') {
+          ctx.fillStyle = `rgba(0, 191, 255, ${this.alpha})`;
+          ctx.font = `${this.size}px monospace`;
+          ctx.fillText(this.text, this.x, this.y);
+        }
+      }
+    }
+
+    let finalHeartShown = false;
+    function generateHeartText(cx, cy, text = "TE AMO") {
+      if (finalHeartShown) return;
+      const targets = generateHeartTargets(cx, cy, 20);
+
+      ctx.save();
+      ctx.font = "48px monospace";
+      const width = ctx.measureText(text).width;
+      ctx.restore();
+      const textX = cx - width / 2;
+      const textY = cy;
+
+      particles.push({
+        x: textX,
+        y: textY,
+        text: text,
+        size: 48,
+        alpha: 1,
+        fadeOut: true
+      });
+
+      for (let i = 0; i < particleCount; i++) {
+        const angle = Math.random() * 2 * Math.PI;
+        const speed = Math.random() * 3 + 1.5;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed - 5;
+        const letter = word[i % word.length];
+        particles.push(new Particle(cx, cy, vx, vy, targets[i].x, targets[i].y, letter));
+      }
+    }
+
+    function drawParticles() {
+      pulseTime++; // Incrementar el contador de tiempo para pulsos
+      for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        if (p.fadeOut) {
+          ctx.fillStyle = `rgba(0, 191, 255, ${p.alpha})`;
+          ctx.font = `${p.size}px monospace`;
+          ctx.fillText(p.text, p.x, p.y);
+          p.alpha -= 0.005;
+          if (p.alpha <= 0) {
+            particles.splice(i, 1);
+          }
+        } else {
+          p.update();
+          p.draw(ctx);
+          if (p.phase === 'done' || p.y > canvas.height + 100) {
+            particles.splice(i, 1);
+          }
+        }
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      drawParticles();
+    }
+    animate();
+
+    let clickCount = 0;
+    let allowClicks = true;
+    canvas.addEventListener("click", (e) => {
+      if (!allowClicks) return;
+      clickCount++;
+      if (clickCount < 20) {
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        generateHeartText(clickX, clickY);
+      } else {
+        simulateHeartBeat();
+        allowClicks = false;
+      }
+    });
+
+    function simulateHeartBeat() {
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const totalPulses = 20;
+      let pulses = 0;
+      let initialDelay = 500;
+      let delayDecrement = (initialDelay - 100) / (totalPulses - 1);
+      let delay = initialDelay;
+
+      function doPulse() {
+        if (pulses < totalPulses) {
+          generateHeartText(centerX, centerY);
+          pulses++;
+          delay = initialDelay - (delayDecrement * (pulses - 1));
+          if (delay < 100) delay = 100;
+          setTimeout(doPulse, delay);
+        } else {
+          finalHeartText(centerX, centerY);
+        }
+      }
+      doPulse();
+    }
+
+    function finalHeartText(cx, cy) {
+      finalHeartShown = true;
+      const targets = generateHeartTargets(cx, cy, 20);
+
+      ctx.save();
+      ctx.font = "48px monospace";
+      const text1 = "TE AMO";
+      const text2 = "FOREVER";
+      const width1 = ctx.measureText(text1).width;
+      const width2 = ctx.measureText(text2).width;
+      ctx.restore();
+
+      const maxWidth = Math.max(width1, width2);
+      const lineHeight = 40;
+
+      // Partículas de texto con pulsación
+      particles.push(new Particle(cx - width1 / 2, cy - lineHeight / 2, 0, 0, cx - width1 / 2, cy - lineHeight / 2, text1, true, 48));
+      particles.push(new Particle(cx - width2 / 2, cy + lineHeight / 2, 0, 0, cx - width2 / 2, cy + lineHeight / 2, text2, true, 48));
+
+      // Partículas del corazón con pulsación
+      for (let i = 0; i < particleCount; i++) {
+        const letter = word[i % word.length];
+        particles.push(new Particle(targets[i].x, targets[i].y, 0, 0, targets[i].x, targets[i].y, letter, true));
+      }
+    }
+  </script>
+</body>
+</html>
